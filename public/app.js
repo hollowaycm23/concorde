@@ -9,16 +9,26 @@ const modal = $('modal');
 const modalContent = $('modal-content');
 
 // AUTH
+let pendingInvite = null;
 $('btn-login').onclick = () => auth('login');
 $('btn-register').onclick = () => auth('register');
-$('btn-join-invite').onclick = async () => {
-  const code = prompt('Código do convite:');
-  if (!code || !currentUser) return alert('Faça login primeiro');
-  await fetch('/api/servers/join', {
+
+async function joinByInvite(code) {
+  const r = await (await fetch('/api/servers/join', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_id: currentUser.id, code })
-  });
+  })).json();
+  if (r.error) return alert(r.error);
   loadServers();
+}
+
+$('btn-join-invite').onclick = async () => {
+  const code = await showPrompt('Entrar com convite', 'Código do convite');
+  if (!code) return;
+  if (currentUser) return joinByInvite(code);
+  // sem login: guarda o código e aplica após entrar
+  pendingInvite = code;
+  $('auth-error').textContent = 'Entre ou crie uma conta — o convite será aplicado automaticamente.';
 };
 
 async function auth(action) {
@@ -47,6 +57,7 @@ async function login(user) {
       <div style="color:#949ba4;font-size:11px">Online</div>
     </div>`;
   try { if (typeof initE2E === 'function') await initE2E(); } catch (e) { console.warn('E2E indisponível:', e); }
+  if (pendingInvite) { const c = pendingInvite; pendingInvite = null; joinByInvite(c); }
   await loadServers();
   await loadDMs();
   registerPush();
@@ -160,6 +171,71 @@ window.saveProfile = async () => {
 window.closeModal = () => modal.classList.add('hidden');
 function showModal(html) { modalContent.innerHTML = html; modal.classList.remove('hidden'); }
 
+// ===== Modais proprios: seletor de tipo de canal (Electron NAO suporta prompt/confirm) =====
+window.showChannelModal = () => {
+  return new Promise(resolve => {
+    showModal(
+      '<h2>Criar canal</h2>' +
+      '<input id="modal-ch-name" placeholder="Nome do canal"' +
+      ' style="width:100%;padding:10px;background:var(--bg-tertiary);border:none;border-radius:4px;color:#fff;margin-bottom:12px" />' +
+      '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+      '<button id="modal-ch-text" style="flex:1"># Texto</button>' +
+      '<button id="modal-ch-voice" style="flex:1">🔊 Voz</button>' +
+      '</div>' +
+      '<button class="secondary" id="modal-cancel" style="width:100%">Cancelar</button>'
+    );
+    const input = $('modal-ch-name');
+    input.focus();
+    const done = type => {
+      const name = input.value.trim();
+      closeModal();
+      resolve(name ? { name: name, type: type } : null);
+    };
+    $('modal-ch-text').onclick = () => done('text');
+    $('modal-ch-voice').onclick = () => done('voice');
+    $('modal-cancel').onclick = () => { closeModal(); resolve(null); };
+    input.onkeydown = e => {
+      if (e.key === 'Enter') done('text');
+      if (e.key === 'Escape') { closeModal(); resolve(null); }
+    };
+  });
+};
+
+// prompt() nao existe no Electron — modais proprios
+function showPrompt(title, placeholder = '', value = '') {
+  return new Promise((resolve) => {
+    modalContent.innerHTML = `
+      <h2>${escapeHtml(title)}</h2>
+      <input id="prompt-input" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(value || '')}"
+        style="width:100%;padding:10px;background:var(--bg-tertiary);border:none;border-radius:4px;color:#fff;margin-bottom:10px" />
+      <button id="prompt-ok">OK</button>
+      <button class="secondary" id="prompt-cancel">Cancelar</button>`;
+    modal.classList.remove('hidden');
+    const input = $('prompt-input');
+    input.focus();
+    input.select();
+    const done = (v) => { modal.classList.add('hidden'); resolve(v); };
+    $('prompt-ok').onclick = () => done(input.value.trim());
+    $('prompt-cancel').onclick = () => done(null);
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') done(input.value.trim());
+      if (e.key === 'Escape') done(null);
+    };
+  });
+}
+
+function showConfirm(msg, okLabel = 'OK', cancelLabel = 'Cancelar') {
+  return new Promise((resolve) => {
+    modalContent.innerHTML = `
+      <h2 style="font-size:16px">${escapeHtml(msg)}</h2>
+      <button id="c-ok">${okLabel}</button>
+      <button class="secondary" id="c-no">${cancelLabel}</button>`;
+    modal.classList.remove('hidden');
+    $('c-ok').onclick = () => { modal.classList.add('hidden'); resolve(true); };
+    $('c-no').onclick = () => { modal.classList.add('hidden'); resolve(false); };
+  });
+}
+
 // SERVIDORES
 async function loadServers() {
   const servers = await (await fetch(`/api/servers/${currentUser.id}`)).json();
@@ -177,7 +253,7 @@ async function loadServers() {
   add.className = 'server-icon add';
   add.textContent = '+';
   add.onclick = async () => {
-    const name = prompt('Nome do servidor:');
+    const name = await showPrompt('Novo servidor', 'Nome do servidor');
     if (!name) return;
     await fetch('/api/servers', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -219,7 +295,7 @@ async function selectServer(server, el) {
       x.title = 'Apagar canal';
       x.onclick = async (ev) => {
         ev.stopPropagation();
-        if (!confirm(`Apagar o canal "${c.name}"? As mensagens dele serão perdidas.`)) return;
+        if (!(await showConfirm(`Apagar o canal "${c.name}"? As mensagens dele serão perdidas.`, 'Apagar'))) return;
         if (currentVoiceChannel && currentVoiceChannel.id === c.id) leaveVoice();
         if (currentChannel && currentChannel.id === c.id) { currentChannel = null; $('messages').innerHTML = ''; }
         await fetch('/api/channels/' + c.id, { method: 'DELETE' });
@@ -241,12 +317,11 @@ async function selectServer(server, el) {
 }
 
 window.addChannel = async (serverId, catId) => {
-  const name = prompt('Nome do canal:');
-  if (!name) return;
-  const isVoice = confirm('OK = canal de VOZ 🔊 | Cancelar = canal de TEXTO #');
+  const res = await showChannelModal();
+  if (!res) return;
   await fetch('/api/channels', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ server_id: serverId, name, category_id: catId, type: isVoice ? 'voice' : 'text' })
+    body: JSON.stringify({ server_id: serverId, name: res.name, category_id: catId, type: res.type })
   });
   selectServer(currentServer);
 };
@@ -350,17 +425,17 @@ function renderMessage(m, isDM = false) {
   if (!isDM) renderReactions(m.id, m.reactions || []);
 }
 
-window.editDM = (msgId) => {
+window.editDM = async (msgId) => {
   const el = document.querySelector(`.message[data-id="${msgId}"] .content`);
   const current = el.textContent.replace(' (editado)', '');
-  const newContent = prompt('Editar mensagem:', current);
+  const newContent = await showPrompt('Editar mensagem', 'Mensagem', current);
   if (newContent && newContent !== current) {
     socket.emit('dm:edit', { message_id: msgId, content: newContent, peerId: currentDM.id });
   }
 };
 
-window.deleteDM = (msgId) => {
-  if (confirm('Deletar mensagem?')) {
+window.deleteDM = async (msgId) => {
+  if (await showConfirm('Deletar mensagem?', 'Deletar')) {
     socket.emit('dm:delete', { message_id: msgId, peerId: currentDM.id });
   }
 };
@@ -378,8 +453,8 @@ function renderReactions(msgId, reactions) {
   });
 }
 
-window.addReaction = (msgId) => {
-  const emoji = prompt('Emoji (ex: 👍 ❤️ 🔥):');
+window.addReaction = async (msgId) => {
+  const emoji = await showPrompt('Reagir', 'Emoji (ex: 👍 ❤️ 🔥)');
   if (emoji) toggleReaction(msgId, emoji.trim());
 };
 
@@ -392,14 +467,14 @@ function toggleReaction(msgId, emoji) {
 window.editMessage = async (msgId) => {
   const msg = document.querySelector(`.message[data-id="${msgId}"] .content`);
   const current = msg.textContent.replace(' (editado)', '');
-  const newContent = prompt('Editar mensagem:', current);
+  const newContent = await showPrompt('Editar mensagem', 'Mensagem', current);
   if (newContent && newContent !== current) {
     socket.emit('message:edit', { message_id: msgId, content: newContent, channel_id: currentChannel.id });
   }
 };
 
-window.deleteMessage = (msgId) => {
-  if (confirm('Deletar mensagem?')) {
+window.deleteMessage = async (msgId) => {
+  if (await showConfirm('Deletar mensagem?', 'Deletar')) {
     socket.emit('message:delete', { message_id: msgId, channel_id: currentChannel.id });
   }
 };

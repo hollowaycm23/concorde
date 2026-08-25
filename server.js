@@ -224,6 +224,7 @@ app.post('/api/servers', (req, res) => {
   db.prepare('INSERT INTO roles (server_id, name, color, permissions) VALUES (?,?,?,?)')
     .run(id, '@everyone', '#99aab5', 0);
   db.prepare('INSERT INTO channels (server_id, name) VALUES (?,?)').run(id, 'geral');
+  db.prepare('INSERT INTO channels (server_id, name, type) VALUES (?,?,?)').run(id, 'Geral', 'voice');
   res.json({ id, name, invite_code: code });
 });
 
