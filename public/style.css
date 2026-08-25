@@ -123,6 +123,11 @@ body { background: var(--bg-primary); color: var(--text-primary); height: 100vh;
 
 /* Grid de telas compartilhadas */
 #screen-grid { position: fixed; right: 16px; bottom: 16px; z-index: 150; display: flex; flex-direction: column; gap: 8px; max-height: 80vh; overflow-y: auto; }
-.screen-tile { background: #000; border-radius: 8px; overflow: hidden; border: 1px solid #3f4147; box-shadow: 0 4px 16px rgba(0,0,0,.5); }
-.screen-tile video { display: block; width: 360px; max-width: 40vw; aspect-ratio: 16/9; object-fit: contain; background: #000; }
+.screen-tile { position: relative; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid #3f4147; box-shadow: 0 4px 16px rgba(0,0,0,.5); }
+.screen-tile video { display: block; width: 360px; max-width: 40vw; aspect-ratio: 16/9; object-fit: contain; background: #000; cursor: pointer; }
+.screen-tile:fullscreen { border: none; border-radius: 0; display: flex; flex-direction: column; justify-content: center; background: #000; }
+.screen-tile:fullscreen video { width: 100vw; height: 100vh; max-width: none; border-radius: 0; }
+.screen-tile:fullscreen .screen-name, .screen-tile:fullscreen .fs-btn { display: none; }
 .screen-name { padding: 4px 8px; font-size: 12px; color: #fff; background: rgba(0,0,0,.75); }
+.fs-btn { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,.6); color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 4px 7px; font-size: 14px; cursor: pointer; backdrop-filter: blur(4px); }
+.fs-btn:hover { background: rgba(88,101,242,.9); border-color: transparent; }

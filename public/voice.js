@@ -300,8 +300,13 @@ function showMediaTile(kind, userId, username, stream, icon) {
     tile = document.createElement('div');
     tile.className = 'screen-tile';
     tile.dataset.id = tileId;
-    tile.innerHTML = `<video autoplay playsinline muted></video><div class="screen-name">${icon} ${username}</div>`;
+    tile.innerHTML = `<video autoplay playsinline muted></video><div class="screen-name">${icon} ${username}</div><button class="fs-btn" title="Tela cheia">⛶</button>`;
+    const fsBtn = tile.querySelector('.fs-btn');
+    fsBtn.onclick = (e) => { e.stopPropagation(); toggleTileFullscreen(tile); };
+    tile.ondblclick = () => toggleTileFullscreen(tile);
     grid.appendChild(tile);
+  } else {
+    tile.querySelector('.screen-name').textContent = `${icon} ${username}`;
   }
   const v = tile.querySelector('video');
   v.srcObject = stream;
@@ -311,6 +316,13 @@ function showMediaTile(kind, userId, username, stream, icon) {
 function removeMediaTile(kind, userId) {
   const grid = $('screen-grid');
   if (!grid) return;
-  grid.querySelector(`.screen-tile[data-id="${kind}-${userId}"]`)?.remove();
+  const tile = grid.querySelector(`.screen-tile[data-id="${kind}-${userId}"]`);
+  if (tile && document.fullscreenElement === tile) document.exitFullscreen().catch(()=>{});
+  tile?.remove();
   if (!grid.querySelector('.screen-tile')) grid.classList.add('hidden');
+}
+
+function toggleTileFullscreen(tile) {
+  if (document.fullscreenElement === tile) document.exitFullscreen().catch(()=>{});
+  else tile.requestFullscreen().catch(()=> tile.querySelector('video')?.requestFullscreen().catch(()=>{}));
 }
