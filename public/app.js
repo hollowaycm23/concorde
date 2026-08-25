@@ -245,8 +245,9 @@ async function loadServers() {
     const div = document.createElement('div');
     div.className = 'server-icon';
     div.textContent = s.name[0].toUpperCase();
-    div.title = s.name;
+    div.title = s.name + (s.owner_id === currentUser.id ? ' (você é o dono — clique direito para deletar)' : ' (clique direito para sair)');
     div.onclick = () => selectServer(s, div);
+    div.oncontextmenu = (e) => { e.preventDefault(); serverAction(s); };
     list.appendChild(div);
   });
   const add = document.createElement('div');
@@ -330,6 +331,37 @@ $('btn-invite').onclick = async () => {
   const { invite_code } = await (await fetch(`/api/servers/${currentServer.id}/invite`)).json();
   navigator.clipboard.writeText(invite_code);
   alert('Código copiado: ' + invite_code);
+};
+
+// Sair (membro) ou deletar (dono) servidor
+async function serverAction(s) {
+  const isOwner = s.owner_id === currentUser.id;
+  if (isOwner) {
+    if (!(await showConfirm(`Deletar o servidor "${s.name}"? Todos os canais e mensagens serão perdidos para todos.`, 'Deletar'))) return;
+    if (currentVoiceChannel) leaveVoice();
+    await fetch('/api/servers/' + s.id, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: currentUser.id })
+    });
+  } else {
+    if (!(await showConfirm(`Sair do servidor "${s.name}"?`, 'Sair'))) return;
+    if (currentVoiceChannel) leaveVoice();
+    await fetch('/api/servers/' + s.id + '/leave', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: currentUser.id })
+    });
+  }
+  if (currentServer && currentServer.id === s.id) {
+    currentServer = null; currentChannel = null;
+    $('messages').innerHTML = '';
+    $('chat-header').firstChild.textContent = '# —';
+  }
+  loadServers();
+}
+window.serverAction = serverAction;
+
+$('btn-leave-server').onclick = () => {
+  if (currentServer) serverAction(currentServer);
 };
 
 $('btn-roles').onclick = async () => {

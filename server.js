@@ -236,9 +236,36 @@ app.post('/api/servers/join', (req, res) => {
   res.json(s);
 });
 
+// Sair de um servidor (o dono não pode sair do próprio)
+app.post('/api/servers/:id/leave', (req, res) => {
+  const { user_id } = req.body;
+  const s = db.prepare('SELECT * FROM servers WHERE id=?').get(req.params.id);
+  if (!s) return res.status(404).json({ error: 'Servidor não existe' });
+  if (s.owner_id === user_id) return res.status(400).json({ error: 'Você é o dono deste servidor — não é possível sair' });
+  db.prepare('DELETE FROM members WHERE user_id=? AND server_id=?').run(user_id, s.id);
+  res.json({ ok: true });
+});
+
 app.get('/api/servers/:id/invite', (req, res) => {
   const s = db.prepare('SELECT invite_code FROM servers WHERE id=?').get(req.params.id);
   res.json(s || {});
+});
+
+// Deletar servidor (apenas o dono; apaga canais, mensagens, cargos e membros)
+app.delete('/api/servers/:id', (req, res) => {
+  const { user_id } = req.body || {};
+  const s = db.prepare('SELECT * FROM servers WHERE id=?').get(req.params.id);
+  if (!s) return res.status(404).json({ error: 'Servidor não existe' });
+  if (s.owner_id !== user_id) return res.status(403).json({ error: 'Apenas o dono pode deletar o servidor' });
+  db.prepare('DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE channel_id IN (SELECT id FROM channels WHERE server_id=?))').run(s.id);
+  db.prepare('DELETE FROM messages WHERE channel_id IN (SELECT id FROM channels WHERE server_id=?)').run(s.id);
+  db.prepare('DELETE FROM channels WHERE server_id=?').run(s.id);
+  db.prepare('DELETE FROM user_roles WHERE server_id=?').run(s.id);
+  db.prepare('DELETE FROM roles WHERE server_id=?').run(s.id);
+  db.prepare('DELETE FROM categories WHERE server_id=?').run(s.id);
+  db.prepare('DELETE FROM members WHERE server_id=?').run(s.id);
+  db.prepare('DELETE FROM servers WHERE id=?').run(s.id);
+  res.json({ ok: true });
 });
 
 // ===== CANAIS =====
