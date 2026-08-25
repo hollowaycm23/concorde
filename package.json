@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "concorde",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Concorde - Chat desktop com voz, video e E2E",
   "main": "electron/main.js",
   "scripts": {
@@ -76,3 +76,4 @@
     "electron@37.10.3": true
   }
 }
+
