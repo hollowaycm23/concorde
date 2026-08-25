@@ -1,6 +1,6 @@
 {
   "name": "concorde",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "description": "Concorde - Chat desktop com voz, video e E2E",
   "main": "electron/main.js",
   "scripts": {
@@ -28,6 +28,7 @@
     "@octokit/rest": "^20.0.2",
     "electron": "^37.2.0",
     "electron-builder": "^24.13.3",
+    "playwright": "^1.62.1",
     "socket.io-client": "^4.8.3"
   },
   "build": {
@@ -76,4 +77,3 @@
     "electron@37.10.3": true
   }
 }
-

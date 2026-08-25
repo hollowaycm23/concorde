@@ -155,7 +155,11 @@ async function startScreenShare() {
       audio: true
     });
   } catch (e) {
-    return; // usuário cancelou o seletor
+    // NotAllowedError = cancelou o picker; outros erros = avisa
+    if (!e || e.name !== 'NotAllowedError') {
+      alert('Falha ao compartilhar tela: ' + (e?.message || e));
+    }
+    return;
   }
   // usuário parou pelo controle do navegador/OS
   screenStream.getVideoTracks()[0]?.addEventListener('ended', () => stopScreenShare());
@@ -163,6 +167,7 @@ async function startScreenShare() {
   // pede ao server quem está no canal p/ enviar a tela a cada um
   socket.emit('voice:who', { channel_id: currentVoiceChannel.id });
   socket.emit('screen:state', { channel_id: currentVoiceChannel.id, sharing: true });
+  showScreenTile(currentUser.id, currentUser.username + ' (você)', screenStream);
   updateShareBtn(true);
 }
 

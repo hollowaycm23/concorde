@@ -199,17 +199,66 @@ function waitForServer(port, tries = 40) {
   });
 }
 
-app.whenReady().then(async () => {
-  // Compartilhamento de tela: usa o seletor nativo do sistema; fallback = tela principal + áudio do sistema
-  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-    try {
-      callback({ useSystemPicker: true });
-    } catch (e) {
-      desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
-        if (sources.length) callback({ video: sources[0], audio: 'loopback' });
-        else callback({});
-      }).catch(() => callback({}));
+// ===== Compartilhamento de tela: picker próprio com telas e janelas =====
+let displayPickerWin = null;
+let displayRequest = null; // { callback, sources }
+
+function closeDisplayPicker(chooseId = null) {
+  if (displayRequest) {
+    const src = chooseId ? (displayRequest.sources || []).find(s => s.id === chooseId) : null;
+    try { displayRequest.callback(src ? { video: src, audio: 'loopback' } : {}); } catch (e) {}
+    displayRequest = null;
+  }
+  if (displayPickerWin) {
+    const w = displayPickerWin;
+    displayPickerWin = null;
+    w.close();
+  }
+}
+
+function openDisplayPicker() {
+  if (displayPickerWin) { displayPickerWin.focus(); return; }
+  displayPickerWin = new BrowserWindow({
+    width: 740,
+    height: 520,
+    parent: mainWindow || undefined,
+    title: 'Compartilhar tela — Concorde',
+    backgroundColor: '#1e1f22',
+    autoHideMenuBar: true,
+    webPreferences: { nodeIntegration: true, contextIsolation: false }
+  });
+  displayPickerWin.loadFile(path.join(__dirname, 'picker.html'));
+  displayPickerWin.on('closed', () => {
+    displayPickerWin = null;
+    if (displayRequest) {
+      try { displayRequest.callback({}); } catch (e) {}
+      displayRequest = null;
     }
+  });
+}
+
+ipcMain.handle('display-media:get-sources', async () => {
+  const sources = await desktopCapturer.getSources({
+    types: ['screen', 'window'],
+    thumbnailSize: { width: 320, height: 180 },
+    fetchWindowIcons: true
+  });
+  if (displayRequest) displayRequest.sources = sources;
+  return sources.map(s => ({
+    id: s.id,
+    name: s.name || (s.id.startsWith('screen') ? 'Tela' : 'Janela'),
+    thumbnail: s.thumbnail.toDataURL(),
+    isScreen: s.id.startsWith('screen')
+  }));
+});
+
+ipcMain.on('display-media:choose', (e, id) => closeDisplayPicker(id));
+
+app.whenReady().then(async () => {
+  // getDisplayMedia -> abre nosso picker (useSystemPicker não é suportado no Windows)
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    displayRequest = { callback, sources: [] };
+    openDisplayPicker();
   });
 
   startServer();

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Compartilhar tela</title>
+<style>
+body { background: #1e1f22; color: #fff; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 14px; }
+h3 { margin: 0 0 12px; font-size: 13px; color: #b9bbbe; text-transform: uppercase; letter-spacing: .06em; }
+#grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; max-height: 62vh; overflow-y: auto; }
+.opt { background: #2b2d31; border: 2px solid transparent; border-radius: 8px; overflow: hidden; cursor: pointer; transition: .15s; }
+.opt:hover { border-color: #5865F2; background: #32353b; }
+.opt img { width: 100%; display: block; background: #000; aspect-ratio: 16/9; object-fit: cover; }
+.opt .nm { padding: 6px 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.actions { margin-top: 12px; text-align: right; }
+button { background: #4f545c; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+button:hover { background: #5e636e; }
+.empty { color: #949ba4; font-size: 13px; padding: 20px; text-align: center; }
+</style>
+</head>
+<body>
+<h3>Escolha o que compartilhar</h3>
+<div id="grid"><div class="empty">Carregando...</div></div>
+<div class="actions"><button id="cancel">Cancelar</button></div>
+<script>
+const { ipcRenderer } = require('electron');
+(async () => {
+  try {
+    const sources = await ipcRenderer.invoke('display-media:get-sources');
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    if (!sources.length) {
+      grid.innerHTML = '<div class="empty">Nenhuma fonte encontrada</div>';
+      return;
+    }
+    sources.forEach(s => {
+      const d = document.createElement('div');
+      d.className = 'opt';
+      d.title = s.name;
+      d.innerHTML = `<img src="${s.thumbnail}"><div class="nm">${s.isScreen ? '🖥️ Tela' : '🪟'} ${s.name}</div>`;
+      d.onclick = () => ipcRenderer.send('display-media:choose', s.id);
+      grid.appendChild(d);
+    });
+  } catch (e) {
+    document.getElementById('grid').innerHTML = '<div class="empty">Erro ao listar fontes</div>';
+  }
+})();
+document.getElementById('cancel').onclick = () => ipcRenderer.send('display-media:choose', null);
+</script>
+</body>
+</html>
