@@ -1,4 +1,4 @@
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+﻿* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
 
 :root {
   --bg-primary: #313338;
@@ -94,7 +94,6 @@ body { background: var(--bg-primary); color: var(--text-primary); height: 100vh;
 .voice-header { color: var(--success); font-weight: bold; margin-bottom: 8px; }
 #voice-users { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
 #voice-users .voice-user { display: flex; align-items: center; gap: 6px; color: #dbdee1; font-size: 13px; }
-#voice-panel button { width: 100%; padding: 8px; background: var(--danger); color: #fff; border: none; border-radius: 4px; cursor: pointer; }
 .voice-user.speaking .avatar { box-shadow: 0 0 0 2px var(--success); }
 
 /* DMs */
@@ -114,3 +113,13 @@ body { background: var(--bg-primary); color: var(--text-primary); height: 100vh;
 .voice-channel-users .vu .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
 #voice-panel { position: fixed; bottom: 60px; left: 312px; background: #232428; padding: 12px; border-radius: 8px; width: 220px; z-index: 50; }
 #voice-panel .voice-channel-name { color: #fff; font-size: 12px; margin-bottom: 8px; }
+#voice-panel button { width: 100%; padding: 8px; border: none; border-radius: 4px; cursor: pointer; margin-top: 6px; color: #fff; }
+#btn-share-screen { background: var(--accent); }
+#btn-share-screen.active { background: var(--danger); }
+#btn-voice-leave { background: var(--danger); }
+
+/* Grid de telas compartilhadas */
+#screen-grid { position: fixed; right: 16px; bottom: 16px; z-index: 150; display: flex; flex-direction: column; gap: 8px; max-height: 80vh; overflow-y: auto; }
+.screen-tile { background: #000; border-radius: 8px; overflow: hidden; border: 1px solid #3f4147; box-shadow: 0 4px 16px rgba(0,0,0,.5); }
+.screen-tile video { display: block; width: 360px; max-width: 40vw; aspect-ratio: 16/9; object-fit: contain; background: #000; }
+.screen-name { padding: 4px 8px; font-size: 12px; color: #fff; background: rgba(0,0,0,.75); }

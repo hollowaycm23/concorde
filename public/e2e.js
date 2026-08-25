@@ -18,12 +18,14 @@ async function initE2E() {
 
 async function sodiumReady() {
   if (!sodium) {
+    if (!window.sodium) throw new Error('libsodium não carregou');
     await window.sodium.ready;
     sodium = window.sodium;
   }
 }
 
 async function generateIdentityKeys() {
+  await sodiumReady();
   identityKey = sodium.crypto_box_keypair();
   localStorage.setItem('e2e-keys', JSON.stringify({
     identity: {

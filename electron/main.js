@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, Tray, Menu, dialog, shell, ipcMain, nativeImage } = require('electron');
+﻿const { app, BrowserWindow, Tray, Menu, dialog, shell, ipcMain, nativeImage, session, desktopCapturer } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 const updater = require('./updater');
@@ -200,6 +200,18 @@ function waitForServer(port, tries = 40) {
 }
 
 app.whenReady().then(async () => {
+  // Compartilhamento de tela: usa o seletor nativo do sistema; fallback = tela principal + áudio do sistema
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    try {
+      callback({ useSystemPicker: true });
+    } catch (e) {
+      desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
+        if (sources.length) callback({ video: sources[0], audio: 'loopback' });
+        else callback({});
+      }).catch(() => callback({}));
+    }
+  });
+
   startServer();
 
   const port = store.get('port', 3000);

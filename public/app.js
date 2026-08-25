@@ -46,7 +46,7 @@ async function login(user) {
       <div style="color:#fff;font-weight:600">${user.username}</div>
       <div style="color:#949ba4;font-size:11px">Online</div>
     </div>`;
-  await initE2E();
+  try { if (typeof initE2E === 'function') await initE2E(); } catch (e) { console.warn('E2E indisponível:', e); }
   await loadServers();
   await loadDMs();
   registerPush();

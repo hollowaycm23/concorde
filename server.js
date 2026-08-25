@@ -567,6 +567,20 @@ io.on('connection', (socket) => {
     socket.to('voice:' + channel_id).emit('voice:user-left', { userId: socket.data.user?.id });
   });
 
+  // quem está no canal (p/ o compartilhador enviar a tela a todos)
+  socket.on('voice:who', ({ channel_id }) => {
+    const m = voiceUsers.get(channel_id);
+    const users = m ? Array.from(m.values()).map(v => v.user) : [];
+    socket.emit('voice:who', { channel_id: Number(channel_id), users });
+  });
+
+  // indicador de compartilhamento de tela no canal
+  socket.on('screen:state', ({ channel_id, sharing }) => {
+    const me = socket.data.user;
+    if (!me) return;
+    socket.to('voice:' + channel_id).emit('screen:state', { channel_id, user_id: me.id, username: me.username, sharing: !!sharing });
+  });
+
   socket.on('disconnect', () => {
     const user = onlineUsers.get(socket.id);
     // remove de todas as salas de voz

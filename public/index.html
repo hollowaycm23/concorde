@@ -78,9 +78,14 @@
 <!-- VOICE PANEL -->
 <div id="voice-panel" class="hidden">
   <div class="voice-header">Conectado por voz 🔊</div>
+  <div class="voice-channel-name" id="voice-channel-name"></div>
   <div id="voice-users"></div>
+  <button id="btn-share-screen">🖥️ Compartilhar Tela</button>
   <button id="btn-voice-leave">Desconectar</button>
 </div>
+
+<!-- TELAS COMPARTILHADAS (remotas + própria) -->
+<div id="screen-grid" class="hidden"></div>
 
 <!-- SCRIPTS -->
 <script src="/socket.io/socket.io.js"></script>
@@ -89,9 +94,9 @@
 <script src="https://cdn.jsdelivr.net/npm/libsodium-wrappers/dist/browsers/sodium.min.js"></script>
 <script src="theme.js"></script>
 <script src="e2e.js"></script>
+<script src="app.js"></script>
 <script src="voice.js"></script>
 <script src="video.js"></script>
-<script src="app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js');
