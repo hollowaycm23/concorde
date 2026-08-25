@@ -1,0 +1,138 @@
+<!-- Modal de atualização -->
+<div id="update-modal" class="modal hidden">
+  <div class="modal-content update-modal">
+    <div class="update-header">
+      <div class="update-icon">🔄</div>
+      <h2 id="update-title">Verificando atualizações...</h2>
+    </div>
+    <div class="update-body">
+      <div id="update-status">Aguarde...</div>
+      <div id="update-progress" class="hidden">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="progress-info">
+          <span id="progress-percent">0%</span>
+          <span id="progress-speed">0 KB/s</span>
+        </div>
+      </div>
+      <div id="update-details" class="hidden"></div>
+    </div>
+    <div class="update-actions" id="update-actions"></div>
+  </div>
+</div>
+
+<style>
+.update-modal { max-width: 500px; text-align: center; }
+.update-header { margin-bottom: 20px; }
+.update-icon { font-size: 48px; margin-bottom: 12px; animation: spin 2s linear infinite; }
+.update-icon.done { animation: none; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.update-body { margin: 20px 0; }
+.progress-bar { width: 100%; height: 8px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden; margin: 12px 0; }
+.progress-fill { height: 100%; background: var(--accent); transition: width 0.3s; width: 0%; }
+.progress-info { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
+#update-details { background: var(--bg-tertiary); padding: 12px; border-radius: 8px; text-align: left; font-size: 13px; max-height: 200px; overflow-y: auto; }
+.update-actions { display: flex; gap: 8px; justify-content: center; margin-top: 20px; }
+.update-actions button { padding: 10px 20px; border-radius: 4px; border: none; cursor: pointer; font-weight: 600; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-secondary { background: transparent; color: var(--text-secondary); }
+</style>
+
+<script>
+// Integração com updater
+if (window.electronAPI?.updater) {
+  const modal = document.getElementById('update-modal');
+  const title = document.getElementById('update-title');
+  const status = document.getElementById('update-status');
+  const progress = document.getElementById('update-progress');
+  const progressFill = document.getElementById('progress-fill');
+  const progressPercent = document.getElementById('progress-percent');
+  const progressSpeed = document.getElementById('progress-speed');
+  const details = document.getElementById('update-details');
+  const actions = document.getElementById('update-actions');
+  const icon = document.querySelector('.update-icon');
+
+  function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  window.electronAPI.updater.onEvent(({ event, data }) => {
+    modal.classList.remove('hidden');
+    
+    switch (event) {
+      case 'checking':
+        title.textContent = 'Verificando atualizações...';
+        status.textContent = 'Conectando ao servidor...';
+        actions.innerHTML = '<button class="btn-secondary" onclick="document.getElementById(\'update-modal\').classList.add(\'hidden\')">Cancelar</button>';
+        break;
+        
+      case 'not-available':
+        icon.classList.add('done');
+        icon.textContent = '✅';
+        title.textContent = 'Você está atualizado!';
+        status.textContent = `Versão ${data.version} é a mais recente.`;
+        actions.innerHTML = '<button class="btn-primary" onclick="document.getElementById(\'update-modal\').classList.add(\'hidden\')">OK</button>';
+        break;
+        
+      case 'available':
+        icon.classList.add('done');
+        icon.textContent = '🎉';
+        title.textContent = `Nova versão: ${data.version}`;
+        status.textContent = 'Uma nova versão está disponível!';
+        if (data.releaseNotes) {
+          details.innerHTML = `<strong>Novidades:</strong><br>${data.releaseNotes}`;
+          details.classList.remove('hidden');
+        }
+        actions.innerHTML = `
+          <button class="btn-primary" onclick="window.electronAPI.updater.download()">Baixar agora</button>
+          <button class="btn-secondary" onclick="document.getElementById('update-modal').classList.add('hidden')">Depois</button>
+        `;
+        break;
+        
+      case 'downloading':
+        icon.textContent = '📥';
+        title.textContent = 'Baixando atualização...';
+        status.textContent = `${formatBytes(data.transferred)} de ${formatBytes(data.total)}`;
+        progress.classList.remove('hidden');
+        progressFill.style.width = `${data.percent}%`;
+        progressPercent.textContent = `${data.percent.toFixed(1)}%`;
+        progressSpeed.textContent = `${formatBytes(data.speed)}/s`;
+        actions.innerHTML = '';
+        break;
+        
+      case 'downloaded':
+        icon.classList.add('done');
+        icon.textContent = '✅';
+        title.textContent = 'Download concluído!';
+        status.textContent = 'A atualização será instalada ao reiniciar.';
+        progress.classList.add('hidden');
+        actions.innerHTML = `
+          <button class="btn-primary" onclick="window.electronAPI.updater.install()">Reiniciar agora</button>
+          <button class="btn-secondary" onclick="document.getElementById('update-modal').classList.add('hidden')">Depois</button>
+        `;
+        break;
+        
+      case 'error':
+        icon.classList.add('done');
+        icon.textContent = '❌';
+        title.textContent = 'Erro na atualização';
+        status.textContent = data.message;
+        actions.innerHTML = '<button class="btn-primary" onclick="document.getElementById(\'update-modal\').classList.add(\'hidden\')">Fechar</button>';
+        break;
+    }
+  });
+
+  // Atalho Ctrl+U para verificar
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 'u') {
+      e.preventDefault();
+      window.electronAPI.updater.check();
+    }
+  });
+}
+</script>

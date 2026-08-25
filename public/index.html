@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Concorde</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <h1>Bem-vindo ao Concorde!</h1>
+    <p>Ficamos felizes em te ver novamente!</p>
+    <input id="auth-username" placeholder="Nome de usuário" />
+    <input id="auth-password" type="password" placeholder="Senha" />
+    <button id="btn-login">Entrar</button>
+    <button id="btn-register" class="secondary">Criar conta</button>
+    <button id="btn-join-invite" class="secondary">Entrar com convite</button>
+    <p id="auth-error" class="error"></p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <div class="server-list" id="server-list"></div>
+
+  <div class="channel-sidebar">
+    <div class="server-header" id="server-name">
+      <span>Servidor</span>
+      <div class="server-actions">
+        <button id="btn-invite" title="Copiar convite">🔗</button>
+        <button id="btn-roles" title="Cargos">⚙</button>
+      </div>
+    </div>
+    <div class="dm-section">
+      <div class="category-header"><span>💬 Mensagens Diretas</span><button id="btn-new-dm" title="Nova mensagem direta">✉</button></div>
+      <div id="dm-list"></div>
+      <div id="dm-typing" class="typing"></div>
+    </div>
+    <div class="channels" id="channel-list"></div>
+    <div class="user-panel">
+      <div class="user-info" id="user-info"></div>
+      <button id="btn-profile" title="Perfil">👤</button>
+      <button id="btn-video" title="Vídeo">📹</button>
+      <button id="btn-theme" title="Tema">🎨</button>
+      <button id="btn-logout" title="Sair">⏻</button>
+    </div>
+  </div>
+
+  <div class="chat">
+    <div class="chat-header" id="chat-header">
+      <span># geral</span>
+      <span id="encryption-badge" class="hidden">🔒 E2E</span>
+    </div>
+    <div class="messages" id="messages"></div>
+    <div id="typing-indicator" class="typing"></div>
+    <div class="chat-input">
+      <button id="btn-attach" title="Anexar">📎</button>
+      <input id="msg-input" placeholder="Mensagem" />
+      <button id="btn-send">➤</button>
+      <input type="file" id="file-input" class="hidden" />
+    </div>
+  </div>
+
+  <div class="members-sidebar">
+    <h3>Online — <span id="online-count">0</span></h3>
+    <div id="members-list"></div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal" class="modal hidden">
+  <div class="modal-content" id="modal-content"></div>
+</div>
+
+<!-- VOICE PANEL -->
+<div id="voice-panel" class="hidden">
+  <div class="voice-header">Conectado por voz 🔊</div>
+  <div id="voice-users"></div>
+  <button id="btn-voice-leave">Desconectar</button>
+</div>
+
+<!-- SCRIPTS -->
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/libsodium-wrappers/dist/browsers/sodium.min.js"></script>
+<script src="theme.js"></script>
+<script src="e2e.js"></script>
+<script src="voice.js"></script>
+<script src="video.js"></script>
+<script src="app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
+</body>
+</html>

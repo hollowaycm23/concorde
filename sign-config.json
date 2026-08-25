@@ -1,0 +1,23 @@
+﻿{
+  "signing": {
+    "enabled": true,
+    "certificatePath": "electron/signing/certificate.pfx",
+    "certificatePassword": "Concorde2026!",
+    "timestampUrl": "http://timestamp.digicert.com",
+    "algorithm": "SHA256",
+    "signInstaller": true,
+    "signUninstaller": true
+  },
+  "certificate": {
+    "subjectName": "Concorde",
+    "organization": "Concorde",
+    "country": "BR",
+    "validYears": 3,
+    "keyLength": 2048
+  },
+  "notes": {
+    "selfSigned": "Certificado auto-assinado funciona apenas em máquinas onde o certificado foi instalado",
+    "production": "Para distribuição pública, compre um certificado de uma CA confiável (DigiCert, Sectigo, etc)"
+  }
+}
+
