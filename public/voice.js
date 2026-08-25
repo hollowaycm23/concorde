@@ -3,8 +3,10 @@ let peer = null;
 let localStream = null;
 let currentVoiceChannel = null;
 let screenStream = null;
+let cameraStream = null;
 const voiceConnections = new Map(); // userId -> { call, audio }
 const screenCalls = new Map();      // userId -> call (minha tela -> ele)
+const cameraCalls = new Map();      // userId -> call (minha câmera -> ele)
 
 async function joinVoiceChannel(channel) {
   if (currentVoiceChannel && currentVoiceChannel.id === channel.id) return;
@@ -36,6 +38,7 @@ async function joinVoiceChannel(channel) {
 
 function leaveVoice() {
   stopScreenShare(true);
+  stopCamera(true);
   if (currentVoiceChannel) {
     socket.emit('voice:leave', { channel_id: currentVoiceChannel.id });
   }
@@ -50,20 +53,31 @@ function leaveVoice() {
   $('voice-users').innerHTML = '';
 }
 
-// ===== CHAMADAS ENTRANTES: voz ou tela =====
+// ===== CHAMADAS ENTRANTES: voz, tela ou câmera =====
 function onIncomingCall(call) {
   const meta = call.metadata || {};
   if (meta.type === 'screen') {
     call.answer(); // recebe somente a tela
     call.on('stream', remote => {
-      showScreenTile(meta.userId, meta.username || ('Usuário ' + meta.userId), remote);
-      // limpa o tile quando o emissor parar de compartilhar
-      remote.getVideoTracks().forEach(t => t.addEventListener('ended', () => removeScreenTile(meta.userId)));
+      showMediaTile('scr', meta.userId, meta.username || ('Usuário ' + meta.userId), remote, '🖥️');
+      remote.getVideoTracks().forEach(t => t.addEventListener('ended', () => removeMediaTile('scr', meta.userId)));
       remote.addEventListener('removetrack', () => {
-        if (!remote.getVideoTracks().length) removeScreenTile(meta.userId);
+        if (!remote.getVideoTracks().length) removeMediaTile('scr', meta.userId);
       });
     });
-    call.on('close', () => removeScreenTile(meta.userId));
+    call.on('close', () => removeMediaTile('scr', meta.userId));
+    return;
+  }
+  if (meta.type === 'camera') {
+    call.answer(); // recebe somente o vídeo
+    call.on('stream', remote => {
+      showMediaTile('cam', meta.userId, meta.username || ('Usuário ' + meta.userId), remote, '📹');
+      remote.getVideoTracks().forEach(t => t.addEventListener('ended', () => removeMediaTile('cam', meta.userId)));
+      remote.addEventListener('removetrack', () => {
+        if (!remote.getVideoTracks().length) removeMediaTile('cam', meta.userId);
+      });
+    });
+    call.on('close', () => removeMediaTile('cam', meta.userId));
     return;
   }
   call.answer(localStream);
@@ -75,6 +89,7 @@ socket.on('voice:user-joined', ({ user, peerId }) => {
   const call = peer.call(peerId, localStream, { metadata: { userId: currentUser.id } });
   handleCall(call, user.id);
   if (screenStream) sendScreenTo(user.id); // novo participante recebe a tela em andamento
+  if (cameraStream) sendCameraTo(user.id); // e a câmera
 });
 
 socket.on('voice:user-left', ({ userId }) => {
@@ -82,6 +97,8 @@ socket.on('voice:user-left', ({ userId }) => {
   if (c) { try { c.call.close(); } catch (e) {} c.audio.remove(); voiceConnections.delete(userId); }
   document.querySelector(`.voice-user[data-id="${userId}"]`)?.remove();
   document.querySelector(`.vu[data-id="${userId}"]`)?.remove();
+  removeMediaTile('scr', userId);
+  removeMediaTile('cam', userId);
 });
 
 // Alguém parou/começou a compartilhar (sinalização instantânea via socket)
@@ -167,14 +184,17 @@ async function startScreenShare() {
   // pede ao server quem está no canal p/ enviar a tela a cada um
   socket.emit('voice:who', { channel_id: currentVoiceChannel.id });
   socket.emit('screen:state', { channel_id: currentVoiceChannel.id, sharing: true });
-  showScreenTile(currentUser.id, currentUser.username + ' (você)', screenStream);
+  showMediaTile('scr', currentUser.id, currentUser.username + ' (você)', screenStream, '🖥️');
   updateShareBtn(true);
 }
 
-// o server responde com quem está no canal -> envia a tela a cada um
+// o server responde com quem está no canal -> envia tela e câmera a cada um
 socket.on('voice:who', ({ channel_id, users }) => {
-  if (!screenStream || !currentVoiceChannel || currentVoiceChannel.id !== channel_id) return;
-  users.filter(u => u.id !== currentUser.id).forEach(u => sendScreenTo(u.id));
+  if (!currentVoiceChannel || currentVoiceChannel.id !== channel_id) return;
+  users.filter(u => u.id !== currentUser.id).forEach(u => {
+    if (screenStream) sendScreenTo(u.id);
+    if (cameraStream) sendCameraTo(u.id);
+  });
 });
 
 function sendScreenTo(userId) {
@@ -195,7 +215,7 @@ function stopScreenShare(silent = false) {
   screenStream = null;
   screenCalls.forEach(c => { try { c.close(); } catch (e) {} });
   screenCalls.clear();
-  removeScreenTile(currentUser.id);
+  removeMediaTile('scr', currentUser.id);
   updateShareBtn(false);
 }
 
@@ -204,6 +224,56 @@ $('btn-share-screen').onclick = () => {
   else startScreenShare();
 };
 
+$('btn-camera').onclick = () => {
+  if (cameraStream) stopCamera();
+  else toggleCamera();
+};
+
+function updateCamBtn(on) {
+  const btn = $('btn-camera');
+  if (!btn) return;
+  btn.textContent = on ? '⏹️ Desligar Câmera' : '📹 Câmera';
+  btn.classList.toggle('active', !!on);
+}
+
+// ===== CÂMERA P2P =====
+async function toggleCamera() {
+  if (!currentVoiceChannel) return alert('Entre em um canal de voz primeiro');
+  if (cameraStream) return stopCamera();
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640 }, audio: false });
+  } catch (e) {
+    return alert('Falha ao acessar a câmera: ' + (e?.message || e));
+  }
+  cameraStream.getVideoTracks()[0]?.addEventListener('ended', () => stopCamera());
+  socket.emit('voice:who', { channel_id: currentVoiceChannel.id });
+  socket.emit('camera:state', { channel_id: currentVoiceChannel.id, sharing: true });
+  showMediaTile('cam', currentUser.id, currentUser.username + ' (você)', cameraStream, '📹');
+  updateCamBtn(true);
+}
+
+function sendCameraTo(userId) {
+  if (!peer || !cameraStream) return;
+  const old = cameraCalls.get(userId);
+  if (old) { try { old.close(); } catch (e) {} }
+  const call = peer.call('user-' + userId, cameraStream, {
+    metadata: { userId: currentUser.id, username: currentUser.username, type: 'camera' }
+  });
+  cameraCalls.set(userId, call);
+}
+
+function stopCamera(silent = false) {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+    if (currentVoiceChannel && !silent) socket.emit('camera:state', { channel_id: currentVoiceChannel.id, sharing: false });
+  }
+  cameraStream = null;
+  cameraCalls.forEach(c => { try { c.close(); } catch (e) {} });
+  cameraCalls.clear();
+  removeMediaTile('cam', currentUser.id);
+  updateCamBtn(false);
+}
+
 function updateShareBtn(sharing) {
   const btn = $('btn-share-screen');
   if (!btn) return;
@@ -211,17 +281,26 @@ function updateShareBtn(sharing) {
   btn.classList.toggle('active', !!sharing);
 }
 
-// ===== GRID DE TELAS REMOTAS =====
-function showScreenTile(userId, username, stream) {
+// Alguém parou/começou a compartilhar (sinalização instantânea via socket)
+socket.on('screen:state', ({ user_id, sharing }) => {
+  if (!sharing) removeMediaTile('scr', user_id);
+});
+socket.on('camera:state', ({ user_id, sharing }) => {
+  if (!sharing) removeMediaTile('cam', user_id);
+});
+
+// ===== GRID DE VÍDEOS REMOTOS (telas e câmeras) =====
+function showMediaTile(kind, userId, username, stream, icon) {
   const grid = $('screen-grid');
   if (!grid) return;
   grid.classList.remove('hidden');
-  let tile = grid.querySelector(`.screen-tile[data-id="${userId}"]`);
+  const tileId = kind + '-' + userId;
+  let tile = grid.querySelector(`.screen-tile[data-id="${tileId}"]`);
   if (!tile) {
     tile = document.createElement('div');
     tile.className = 'screen-tile';
-    tile.dataset.id = userId;
-    tile.innerHTML = `<video autoplay playsinline muted></video><div class="screen-name">🖥️ ${username}</div>`;
+    tile.dataset.id = tileId;
+    tile.innerHTML = `<video autoplay playsinline muted></video><div class="screen-name">${icon} ${username}</div>`;
     grid.appendChild(tile);
   }
   const v = tile.querySelector('video');
@@ -229,9 +308,9 @@ function showScreenTile(userId, username, stream) {
   v.play().catch(() => {});
 }
 
-function removeScreenTile(userId) {
+function removeMediaTile(kind, userId) {
   const grid = $('screen-grid');
   if (!grid) return;
-  grid.querySelector(`.screen-tile[data-id="${userId}"]`)?.remove();
+  grid.querySelector(`.screen-tile[data-id="${kind}-${userId}"]`)?.remove();
   if (!grid.querySelector('.screen-tile')) grid.classList.add('hidden');
 }

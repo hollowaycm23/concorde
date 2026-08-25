@@ -43,7 +43,6 @@
     <div class="user-panel">
       <div class="user-info" id="user-info"></div>
       <button id="btn-profile" title="Perfil">👤</button>
-      <button id="btn-video" title="Vídeo">📹</button>
       <button id="btn-theme" title="Tema">🎨</button>
       <button id="btn-logout" title="Sair">⏻</button>
     </div>
@@ -80,6 +79,7 @@
   <div class="voice-header">Conectado por voz 🔊</div>
   <div class="voice-channel-name" id="voice-channel-name"></div>
   <div id="voice-users"></div>
+  <button id="btn-camera">📹 Câmera</button>
   <button id="btn-share-screen">🖥️ Compartilhar Tela</button>
   <button id="btn-voice-leave">Desconectar</button>
 </div>
@@ -90,13 +90,11 @@
 <!-- SCRIPTS -->
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/libsodium-wrappers/dist/browsers/sodium.min.js"></script>
 <script src="theme.js"></script>
 <script src="e2e.js"></script>
 <script src="app.js"></script>
 <script src="voice.js"></script>
-<script src="video.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js');

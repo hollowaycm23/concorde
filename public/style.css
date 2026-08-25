@@ -40,6 +40,9 @@ body { background: var(--bg-primary); color: var(--text-primary); height: 100vh;
 .channel { padding: 8px; border-radius: 4px; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
 .channel:hover { background: #35373c; color: var(--text-primary); }
 .channel.active { background: #404249; color: #fff; }
+.ch-del { display: none; margin-left: auto; color: var(--text-secondary); font-size: 11px; padding: 0 4px; border-radius: 3px; }
+.ch-del:hover { color: var(--danger); background: #3a3c42; }
+.channel:hover .ch-del { display: inline-block; }
 .user-panel { padding: 8px; background: #232428; display: flex; align-items: center; gap: 8px; }
 .user-info { flex: 1; display: flex; align-items: center; gap: 8px; }
 .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; }

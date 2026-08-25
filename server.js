@@ -263,6 +263,15 @@ app.post('/api/channels', (req, res) => {
   res.json({ id: r.lastInsertRowid, name, is_encrypted, type: type === 'voice' ? 'voice' : 'text' });
 });
 
+// Apagar canal (mensagens e reações junto)
+app.delete('/api/channels/:id', (req, res) => {
+  const id = req.params.id;
+  db.prepare('DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE channel_id=?)').run(id);
+  db.prepare('DELETE FROM messages WHERE channel_id=?').run(id);
+  db.prepare('DELETE FROM channels WHERE id=?').run(id);
+  res.json({ ok: true });
+});
+
 // ===== ROLES =====
 app.get('/api/roles/:serverId', (req, res) => {
   res.json(db.prepare('SELECT * FROM roles WHERE server_id=?').all(req.params.serverId));
@@ -579,6 +588,13 @@ io.on('connection', (socket) => {
     const me = socket.data.user;
     if (!me) return;
     socket.to('voice:' + channel_id).emit('screen:state', { channel_id, user_id: me.id, username: me.username, sharing: !!sharing });
+  });
+
+  // indicador de câmera ligada no canal
+  socket.on('camera:state', ({ channel_id, sharing }) => {
+    const me = socket.data.user;
+    if (!me) return;
+    socket.to('voice:' + channel_id).emit('camera:state', { channel_id, user_id: me.id, username: me.username, sharing: !!sharing });
   });
 
   socket.on('disconnect', () => {

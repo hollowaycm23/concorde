@@ -213,6 +213,19 @@ async function selectServer(server, el) {
       const d = document.createElement('div');
       d.className = 'channel' + (c.type === 'voice' ? ' voice' : '');
       d.innerHTML = `${c.type === 'voice' ? '🔊' : '#'} ${c.name}${c.is_encrypted ? ' 🔒' : ''}`;
+      const x = document.createElement('span');
+      x.className = 'ch-del';
+      x.textContent = '✕';
+      x.title = 'Apagar canal';
+      x.onclick = async (ev) => {
+        ev.stopPropagation();
+        if (!confirm(`Apagar o canal "${c.name}"? As mensagens dele serão perdidas.`)) return;
+        if (currentVoiceChannel && currentVoiceChannel.id === c.id) leaveVoice();
+        if (currentChannel && currentChannel.id === c.id) { currentChannel = null; $('messages').innerHTML = ''; }
+        await fetch('/api/channels/' + c.id, { method: 'DELETE' });
+        selectServer(currentServer);
+      };
+      d.appendChild(x);
       d.onclick = () => selectChannel(c, d);
       list.appendChild(d);
       if (c.type === 'voice') {
