@@ -10,6 +10,10 @@ const cameraCalls = new Map();      // userId -> call (minha câmera -> ele)
 
 async function joinVoiceChannel(channel) {
   if (currentVoiceChannel && currentVoiceChannel.id === channel.id) return;
+  if (!navigator.mediaDevices?.getUserMedia) {
+    alert('Voz requer HTTPS. No navegador, acesse via https:// (use o Cloudflare Tunnel) ou instale o app desktop.');
+    return;
+  }
   try {
     if (!localStream) {
       localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -165,6 +169,10 @@ $('btn-voice-leave').onclick = leaveVoice;
 // ===== COMPARTILHAMENTO DE TELA =====
 async function startScreenShare() {
   if (!currentVoiceChannel) return alert('Entre em um canal de voz primeiro');
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    alert('Compartilhamento de tela requer HTTPS ou app desktop. Use Cloudflare Tunnel.');
+    return;
+  }
   if (screenStream) return;
   try {
     screenStream = await navigator.mediaDevices.getDisplayMedia({
@@ -239,6 +247,10 @@ function updateCamBtn(on) {
 // ===== CÂMERA P2P =====
 async function toggleCamera() {
   if (!currentVoiceChannel) return alert('Entre em um canal de voz primeiro');
+  if (!navigator.mediaDevices?.getUserMedia) {
+    alert('Câmera requer HTTPS. Acesse via https:// (Cloudflare Tunnel).');
+    return;
+  }
   if (cameraStream) return stopCamera();
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640 }, audio: false });

@@ -19,6 +19,7 @@
     <button id="btn-register" class="secondary">Criar conta</button>
     <button id="btn-join-invite" class="secondary">Entrar com convite</button>
     <p id="auth-error" class="error"></p>
+    <p style="margin-top:14px; font-size:11px; color:#949ba4"><span id="remote-label-auth"></span> <a href="#" onclick="showRemoteModal(); return false;" style="color:#00a8fc">Trocar servidor</a></p>
   </div>
 </div>
 
@@ -45,6 +46,7 @@
       <div class="user-info" id="user-info"></div>
       <button id="btn-profile" title="Perfil">👤</button>
       <button id="btn-theme" title="Tema">🎨</button>
+      <button id="btn-remote" title="Trocar servidor" onclick="showRemoteModal()">🌐</button>
       <button id="btn-logout" title="Sair">⏻</button>
     </div>
   </div>

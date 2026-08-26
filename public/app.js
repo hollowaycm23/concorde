@@ -1,5 +1,4 @@
-const socket = io();
-let currentUser = null, currentServer = null, currentChannel = null;
+﻿let currentUser = null, currentServer = null, currentChannel = null;
 let currentDM = null, dmMode = false;
 let pendingFile = null;
 let typingTimeout = null;
@@ -8,13 +7,46 @@ const $ = id => document.getElementById(id);
 const modal = $('modal');
 const modalContent = $('modal-content');
 
+// Servidor remoto (para conectar via Cloudflare Tunnel / IP fixo com HTTPS)
+// Armazenado em localStorage; se vazio usa o servidor embutido (localhost)
+const REMOTE_URL = (localStorage.getItem('concorde_remote_url') || '').replace(/\/$/, '');
+const API = (path) => (REMOTE_URL ? REMOTE_URL + path : path);
+const socket = io(REMOTE_URL || undefined, REMOTE_URL ? { transports: ['websocket','polling'] } : {});
+
+// UI para trocar servidor
+window.showRemoteModal = async () => {
+  const cur = localStorage.getItem('concorde_remote_url') || '';
+  const url = await showPrompt('Conectar a servidor remoto', 'https://xxx.trycloudflare.com ou http://IP:3000', cur);
+  if (url === null) return;
+  const clean = url.trim().replace(/\/$/, '');
+  if (!clean) {
+    localStorage.removeItem('concorde_remote_url');
+    alert('Voltando ao servidor local. Recarregue a página.');
+  } else {
+    try { new URL(clean); } catch(e) { return alert('URL inválida'); }
+    localStorage.setItem('concorde_remote_url', clean);
+    alert('Servidor remoto salvo: ' + clean + '\nRecarregue a página para conectar.');
+  }
+  location.reload();
+};
+(function updateRemoteLabel(){
+  const upd = () => {
+    const cur = localStorage.getItem('concorde_remote_url');
+    const txt = cur ? cur : 'Local (localhost:3000)';
+    const el = document.getElementById('remote-label-auth');
+    if (el) el.textContent = txt;
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', upd);
+  else upd();
+})();
+
 // AUTH
 let pendingInvite = null;
 $('btn-login').onclick = () => auth('login');
 $('btn-register').onclick = () => auth('register');
 
 async function joinByInvite(code) {
-  const r = await (await fetch('/api/servers/join', {
+  const r = await (await fetch(API('/api/servers/join', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_id: currentUser.id, code })
   })).json();
@@ -32,7 +64,7 @@ $('btn-join-invite').onclick = async () => {
 };
 
 async function auth(action) {
-  const res = await fetch('/api/' + action, {
+  const res = await fetch(API('/api/' + action, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: $('auth-username').value, password: $('auth-password').value })
   });
@@ -65,7 +97,7 @@ async function login(user) {
 
 // ===== DMs =====
 async function loadDMs() {
-  const peers = await (await fetch(`/api/dm/peers/${currentUser.id}`)).json();
+  const peers = await (await fetch(API(`/api/dm/peers/${currentUser.id}`)).json();
   const list = $('dm-list');
   list.innerHTML = '';
   peers.forEach(p => {
@@ -93,7 +125,7 @@ async function selectDM(peer) {
   $('chat-header').firstChild.textContent = `👤 ${peer.username}`;
   $('encryption-badge').classList.add('hidden');
   $('msg-input').placeholder = `Mensagem para ${peer.username}`;
-  const msgs = await (await fetch(`/api/dm/${peer.id}/messages?userId=${currentUser.id}`)).json();
+  const msgs = await (await fetch(API(`/api/dm/${peer.id}/messages?userId=${currentUser.id}`)).json();
   $('messages').innerHTML = '';
   for (const m of msgs) {
     const dec = await decryptIfNeeded(m);
@@ -115,7 +147,7 @@ window.openDmModal = () => {
 window.searchUsers = async () => {
   const q = $('dm-search').value.trim();
   if (!q) return $('dm-search-results').innerHTML = '';
-  const users = await (await fetch(`/api/users/search?q=${encodeURIComponent(q)}&me=${currentUser.id}`)).json();
+  const users = await (await fetch(API(`/api/users/search?q=${encodeURIComponent(q)}&me=${currentUser.id}`)).json();
   $('dm-search-results').innerHTML = users.map(u => `
     <div class="dm-item" onclick="startDM(${u.id},'${u.username}','${u.avatar_color}')">
       <div class="avatar" style="background:${u.avatar_color}">${u.username[0].toUpperCase()}</div>
@@ -138,7 +170,7 @@ window.memberClick = (id, username, color) => {
 $('btn-new-dm').onclick = openDmModal;
 
 $('btn-profile').onclick = async () => {
-  const p = await (await fetch('/api/profile/' + currentUser.id)).json();
+  const p = await (await fetch(API('/api/profile/' + currentUser.id)).json();
   showModal(`
     <h2>Editar perfil</h2>
     <label>Bio</label>
@@ -153,7 +185,7 @@ $('btn-profile').onclick = async () => {
 };
 
 window.saveProfile = async () => {
-  await fetch('/api/profile', {
+  await fetch(API('/api/profile', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       user_id: currentUser.id,
@@ -238,7 +270,7 @@ function showConfirm(msg, okLabel = 'OK', cancelLabel = 'Cancelar') {
 
 // SERVIDORES
 async function loadServers() {
-  const servers = await (await fetch(`/api/servers/${currentUser.id}`)).json();
+  const servers = await (await fetch(API(`/api/servers/${currentUser.id}`)).json();
   const list = $('server-list');
   list.innerHTML = '';
   servers.forEach(s => {
@@ -256,7 +288,7 @@ async function loadServers() {
   add.onclick = async () => {
     const name = await showPrompt('Novo servidor', 'Nome do servidor');
     if (!name) return;
-    await fetch('/api/servers', {
+    await fetch(API('/api/servers', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, owner_id: currentUser.id })
     });
@@ -271,7 +303,7 @@ async function selectServer(server, el) {
   document.querySelectorAll('.server-icon').forEach(e => e.classList.remove('active'));
   el?.classList?.add('active');
   $('server-name').firstChild.textContent = server.name;
-  const channels = await (await fetch(`/api/channels/${server.id}`)).json();
+  const channels = await (await fetch(API(`/api/channels/${server.id}`)).json();
 
   const list = $('channel-list');
   list.innerHTML = '';
@@ -299,7 +331,7 @@ async function selectServer(server, el) {
         if (!(await showConfirm(`Apagar o canal "${c.name}"? As mensagens dele serão perdidas.`, 'Apagar'))) return;
         if (currentVoiceChannel && currentVoiceChannel.id === c.id) leaveVoice();
         if (currentChannel && currentChannel.id === c.id) { currentChannel = null; $('messages').innerHTML = ''; }
-        await fetch('/api/channels/' + c.id, { method: 'DELETE' });
+        await fetch(API('/api/channels/' + c.id, { method: 'DELETE' });
         selectServer(currentServer);
       };
       d.appendChild(x);
@@ -320,7 +352,7 @@ async function selectServer(server, el) {
 window.addChannel = async (serverId, catId) => {
   const res = await showChannelModal();
   if (!res) return;
-  await fetch('/api/channels', {
+  await fetch(API('/api/channels', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ server_id: serverId, name: res.name, category_id: catId, type: res.type })
   });
@@ -328,7 +360,7 @@ window.addChannel = async (serverId, catId) => {
 };
 
 $('btn-invite').onclick = async () => {
-  const { invite_code } = await (await fetch(`/api/servers/${currentServer.id}/invite`)).json();
+  const { invite_code } = await (await fetch(API(`/api/servers/${currentServer.id}/invite`)).json();
   navigator.clipboard.writeText(invite_code);
   alert('Código copiado: ' + invite_code);
 };
@@ -339,14 +371,14 @@ async function serverAction(s) {
   if (isOwner) {
     if (!(await showConfirm(`Deletar o servidor "${s.name}"? Todos os canais e mensagens serão perdidos para todos.`, 'Deletar'))) return;
     if (currentVoiceChannel) leaveVoice();
-    await fetch('/api/servers/' + s.id, {
+    await fetch(API('/api/servers/' + s.id, {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: currentUser.id })
     });
   } else {
     if (!(await showConfirm(`Sair do servidor "${s.name}"?`, 'Sair'))) return;
     if (currentVoiceChannel) leaveVoice();
-    await fetch('/api/servers/' + s.id + '/leave', {
+    await fetch(API('/api/servers/' + s.id + '/leave', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: currentUser.id })
     });
@@ -365,7 +397,7 @@ $('btn-leave-server').onclick = () => {
 };
 
 $('btn-roles').onclick = async () => {
-  const roles = await (await fetch(`/api/roles/${currentServer.id}`)).json();
+  const roles = await (await fetch(API(`/api/roles/${currentServer.id}`)).json();
   showModal(`
     <h2>Cargos de ${currentServer.name}</h2>
     ${roles.map(r => `<div><span class="role-badge" style="background:${r.color}33;color:${r.color}">${r.name}</span></div>`).join('')}
@@ -378,7 +410,7 @@ $('btn-roles').onclick = async () => {
 };
 
 window.createRole = async () => {
-  await fetch('/api/roles', {
+  await fetch(API('/api/roles', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       server_id: currentServer.id,
@@ -406,7 +438,7 @@ async function selectChannel(channel, el) {
   $('encryption-badge').classList.toggle('hidden', !channel.is_encrypted);
   $('msg-input').placeholder = `Conversar em #${channel.name}`;
   socket.emit('channel:join', channel.id);
-  const msgs = await (await fetch(`/api/messages/${channel.id}?userId=${currentUser.id}`)).json();
+  const msgs = await (await fetch(API(`/api/messages/${channel.id}?userId=${currentUser.id}`)).json();
   $('messages').innerHTML = '';
   for (const m of msgs) {
     const decrypted = await decryptIfNeeded(m);
@@ -523,7 +555,7 @@ $('file-input').onchange = async (e) => {
   if (!file) return;
   const form = new FormData();
   form.append('file', file);
-  const res = await fetch('/api/upload', { method: 'POST', body: form });
+  const res = await fetch(API('/api/upload', { method: 'POST', body: form });
   pendingFile = await res.json();
   $('msg-input').placeholder = `Enviando: ${pendingFile.name} (pressione Enter)`;
 };
@@ -637,14 +669,14 @@ socket.on('dm:deleted', ({ message_id }) => {
   loadDMs();
 });
 socket.on('reaction:update', async ({ message_id }) => {
-  const msgs = await (await fetch(`/api/messages/${currentChannel.id}?userId=${currentUser.id}`)).json();
+  const msgs = await (await fetch(API(`/api/messages/${currentChannel.id}?userId=${currentUser.id}`)).json();
   const m = msgs.find(x => x.id === message_id);
   if (m) renderReactions(message_id, m.reactions);
 });
 
 // MEMBROS
 async function loadMembers() {
-  const members = await (await fetch(`/api/members/${currentServer.id}`)).json();
+  const members = await (await fetch(API(`/api/members/${currentServer.id}`)).json();
   const list = $('members-list');
   list.innerHTML = '';
   members.forEach(m => {
@@ -678,7 +710,7 @@ async function registerPush() {
       userVisibleOnly: true,
       applicationServerKey: 'BImmoMQjxe9ZLHB0utz36FlgAGJLWAUtt87NCFAxA4l6UNPyXgfsuNVzf7L8iq_4WSKJblyvSkk1g3SjG8zYX2s'
     });
-    await fetch('/api/push/subscribe', {
+    await fetch(API('/api/push/subscribe', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: currentUser.id, subscription: sub.toJSON() })
     });
